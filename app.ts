@@ -11,10 +11,10 @@ async function getBody(request: http.IncomingMessage): Promise<string> {
         const bodyParts: any[] = [];
         let body;
         request.on('data', (chunk) => {
-            console.log('data');
+            // console.log('data');
             bodyParts.push(chunk);
         }).on('end', () => {
-            console.log('end');
+            // console.log('end');
             body = Buffer.concat(bodyParts).toString();
             resolve(body);
         });
@@ -114,7 +114,8 @@ function main() {
             } else if (url === 'debug') {
                 response.statusCode = 200;
                 response.setHeader('Content-Type', 'application/json');
-                response.end(JSON.stringify(waiting));
+                // response.end(JSON.stringify(waiting));
+                response.end('{}');
             } else {
                 throw new Error('unhandled endpoint');
             }
