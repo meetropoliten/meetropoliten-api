@@ -11,10 +11,12 @@ async function getBody(request: http.IncomingMessage): Promise<string> {
         const bodyParts: any[] = [];
         let body;
         request.on('data', (chunk) => {
+            console.log('data');
             bodyParts.push(chunk);
         }).on('end', () => {
+            console.log('end');
             body = Buffer.concat(bodyParts).toString();
-            resolve(body)
+            resolve(body);
         });
     });
 }
@@ -48,7 +50,7 @@ function main() {
                     let id = crypto.randomBytes(8).toString('hex');
                     while (waiting[id] !== undefined) {
                         id = crypto.randomBytes(8).toString('hex');
-                    };
+                    }
 
                     waiting[id] = {
                         description: description,
@@ -76,7 +78,7 @@ function main() {
             } else if (url === 'calling' && request.method === 'POST') {
                 const body: string = await getBody(request);
                 const waitingId: string = JSON.parse(body).waitingId || '';
-                const callingDescription: string = JSON.parse(body).callingDescription || ''
+                const callingDescription: string = JSON.parse(body).callingDescription || '';
 
                 if (waitingId === '') {
                     throw new Error('empty waitingId');
@@ -122,8 +124,8 @@ function main() {
             console.log(request.url);
             console.log(request.method);
 
-            const body = await getBody(request);
-            console.log(body);
+            // const body = await getBody(request);
+            // console.log(body);
 
             response.statusCode = 404;
             response.setHeader('Content-Type', 'application/json');
