@@ -3,8 +3,8 @@ import crypto from 'crypto';
 
 const hostname = '127.0.0.1';
 const port = 3000;
-const waiting: { [id: string]: { description: string, callingDescription: string } } = {};
-const waitingRev: { [description: string]: string } = {};
+const hosts: { [id: string]: { description: string, guestDescription: string } } = {};
+const hostsRev: { [description: string]: string } = {};
 
 async function getBody(request: http.IncomingMessage): Promise<string> {
     return new Promise((resolve) => {
@@ -33,88 +33,96 @@ function main() {
             }
             const url = urlStruct.pathname.split('/').filter(item => !!item).at(-1) || '';
 
-            if (url === 'waiting' && request.method === 'POST') {
+            if (url === 'host' && request.method === 'POST') {
                 const body: string = await getBody(request);
                 const description: string = JSON.parse(body).description || '';
+                let id: string = JSON.parse(body).id || (hostsRev[description] ? hostsRev[description] : '');
 
                 if (description === '') {
                     throw new Error('empty description');
                 }
 
-                if (waitingRev[description]) {
-                    response.statusCode = 200;
-                    response.setHeader('Content-Type', 'application/json');
-                    response.end(`{"id": "${waitingRev[description]}"}`);
-                    response.end();
-                } else {
-                    let id = crypto.randomBytes(8).toString('hex');
-                    while (waiting[id] !== undefined) {
-                        id = crypto.randomBytes(8).toString('hex');
-                    }
-
-                    waiting[id] = {
-                        description: description,
-                        callingDescription: ''
-                    };
-                    waitingRev[description] = id;
-
-                    response.statusCode = 200;
-                    response.setHeader('Content-Type', 'application/json');
-                    response.end(`{"id": "${id}"}`);
+                if (hosts[id]) {
+                    delete hostsRev[hosts[id].description];
+                    delete hosts[id];
                 }
-            } else if (url === 'waiting' && request.method === 'GET') {
-                const waitingId: string = urlStruct.searchParams.get('id') || '';
-                const waitingEntry = waiting[waitingId];
-                if (!waitingEntry) {
-                    throw new Error('need id');
+                if (hostsRev[description]) {
+                    delete hosts[hostsRev[description]];
+                    delete hostsRev[description];
                 }
-                if (waitingEntry.callingDescription) {
-                    throw new Error(`${waitingId} already in a call`);
+
+                if (id === '') {
+                    do {
+                        id = `${crypto.randomBytes(4).toString('hex')} ${crypto.randomBytes(4).toString('hex')}`;
+                    } while (hosts[id] !== undefined);
+                }
+
+                hosts[id] = {
+                    description: description,
+                    guestDescription: ''
+                };
+                hostsRev[description] = id;
+
+                response.statusCode = 200;
+                response.setHeader('Content-Type', 'application/json');
+                response.end(`{"id": "${id}"}`);
+            } else if (url === 'host' && request.method === 'GET') {
+                const id: string = urlStruct.searchParams.get('id') || '';
+                const host = hosts[id];
+                if (!host) {
+                    throw new Error('need host id');
+                }
+                if (host.guestDescription) {
+                    throw new Error(`host ${id} already in a call`);
                 }
 
                 response.statusCode = 200;
                 response.setHeader('Content-Type', 'application/json');
-                response.end(`{"id": "${waitingId}", "description": "${waitingEntry.description}"}`);
-            } else if (url === 'calling' && request.method === 'POST') {
+                response.end(`{"id": "${id}", "description": "${host.description}"}`);
+            } else if (url === 'guest' && request.method === 'POST') {
                 const body: string = await getBody(request);
-                const waitingId: string = JSON.parse(body).waitingId || '';
-                const callingDescription: string = JSON.parse(body).callingDescription || '';
+                const hostId: string = JSON.parse(body).hostId || '';
+                const guestDescription: string = JSON.parse(body).guestDescription || '';
 
-                if (waitingId === '') {
-                    throw new Error('empty waitingId');
+                if (hostId === '') {
+                    throw new Error('empty hostId');
                 }
-                if (callingDescription === '') {
-                    throw new Error('empty callingDescription');
+                if (guestDescription === '') {
+                    throw new Error('empty guestDescription');
                 }
-                const waitingDescription = waiting[waitingId];
-                if (!waitingDescription) {
-                    throw new Error('invalid waitingId');
+                const host = hosts[hostId];
+                if (!host) {
+                    throw new Error('host not found');
                 }
 
-                waitingDescription.callingDescription = callingDescription;
+                host.guestDescription = guestDescription;
 
                 response.statusCode = 200;
                 response.setHeader('Content-Type', 'application/json');
                 response.end('{}');
-            } else if (url === 'calling' && request.method === 'GET') {
-                const waitingId: string = urlStruct.searchParams.get('id') || '';
+            } else if (url === 'guest' && request.method === 'GET') {
+                const hostId: string = urlStruct.searchParams.get('hostId') || '';
 
-                const waitingEntry = waiting[waitingId];
-                if (!waitingEntry) {
-                    throw new Error('need id');
+                if (hostId === '') {
+                    throw new Error('empty hostId');
+                }
+
+                const host = hosts[hostId];
+                if (!host) {
+                    throw new Error('host not found');
                 }
 
                 response.statusCode = 200;
                 response.setHeader('Content-Type', 'application/json');
-                response.end(`{"callingDescription": "${waitingEntry.callingDescription}"}`);
+                response.end(`{"guestDescription": "${host.guestDescription}"}`);
 
-                if (waitingEntry.callingDescription) {
-                    delete waiting[waitingId];
+                if (host.guestDescription) {
+                    delete hosts[hostId];
                 }
             } else if (url === 'debug') {
                 response.statusCode = 200;
                 response.setHeader('Content-Type', 'application/json');
-                // response.end(JSON.stringify(waiting));
+                // response.end(JSON.stringify(hosts));
                 response.end('{}');
             } else {
                 throw new Error('unhandled endpoint');
